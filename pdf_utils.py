@@ -1,62 +1,31 @@
 import PyPDF2
 import io
 import re
-import tempfile
+import fitz  # PyMuPDF
 from typing import List, Tuple, Dict, Optional
-from pdf2image import convert_from_bytes
-import pytesseract
 from PIL import Image
+import pytesseract
 
 def extract_text_from_pdf(pdf_file) -> Tuple[str, int]:
-    """
-    Extract text from a PDF file using OCR.
-    
-    Args:
-        pdf_file: The uploaded PDF file object
-    
-    Returns:
-        Tuple containing the extracted text and the number of pages
-    """
+    """Extract text from a PDF file using PyMuPDF."""
     try:
-        # Create a PDF file reader object
         pdf_bytes = pdf_file.getvalue() if hasattr(pdf_file, 'getvalue') else pdf_file.read()
-        pdf_reader = PyPDF2.PdfReader(io.BytesIO(pdf_bytes))
-        
-        # Get the number of pages
-        num_pages = len(pdf_reader.pages)
-        
-        # Convert PDF to images with higher DPI for better OCR
-        images = convert_from_bytes(pdf_bytes, dpi=400)  # Increased DPI for better recognition
+        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
         text = ""
         
-        # Extract text from each image using enhanced OCR with better Arabic support
-        for image in images:
-            # Convert to grayscale for better OCR performance
-            img_gray = image.convert('L')
+        for page in doc:
+            # Get text directly from PDF
+            page_text = page.get_text()
             
-            try:
-                # Best configuration for Arabic
-                page_text = pytesseract.image_to_string(
-                    img_gray, 
-                    lang='ara+ita', 
-                    config='--psm 6 --oem 1'
-                )
-                
-                # If no text is extracted or very little, try different configurations
-                if len(page_text.strip()) < 20:
-                    page_text = pytesseract.image_to_string(
-                        img_gray, 
-                        lang='ara', 
-                        config='--psm 3 --oem 1'
-                    )
-                
-            except Exception as e:
-                print(f"OCR exception: {str(e)}")
-                page_text = pytesseract.image_to_string(img_gray)
+            # If no text found, try OCR
+            if not page_text.strip():
+                pix = page.get_pixmap(matrix=fitz.Matrix(300/72, 300/72))
+                img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+                page_text = pytesseract.image_to_string(img, lang='ara+ita')
             
             text += page_text + "\n\n"
         
-        return text, num_pages
+        return text, len(doc)
             
     except Exception as e:
         raise Exception(f"Error extracting text from PDF: {str(e)}")
@@ -156,111 +125,7 @@ def fix_arabic_ocr_errors(text: str) -> str:
     arabic_ligatures = {
         # لا family
         'ﻻ': 'لا',
-        'ﻼ': 'لا',
-        'ﻵ': 'لآ',
-        'ﻶ': 'لآ',
-        'ﻷ': 'لأ',
-        'ﻸ': 'لأ',
-        'ﻹ': 'لإ',
-        'ﻺ': 'لإ',
-
-        # Common letter combinations
-        'ﺠﻤ': 'جم',
-        'ﺠﻣ': 'جم',
-        'ﺤﻤ': 'حم',
-        'ﺤﻣ': 'حم',
-        'ﻣﺤ': 'مح',
-        'ﻤﺤ': 'مح',
-        'ﻌﻠ': 'عل',
-        'ﻋﻠ': 'عل',
-        'ﻤﻌ': 'مع',
-        'ﻣﻌ': 'مع',
         
-        # Beginning forms
-        'ﺑ': 'ب',
-        'ﺗ': 'ت',
-        'ﺛ': 'ث',
-        'ﺟ': 'ج',
-        'ﺣ': 'ح',
-        'ﺧ': 'خ',
-        'ﺳ': 'س',
-        'ﺷ': 'ش',
-        'ﺻ': 'ص',
-        'ﺿ': 'ض',
-        'ﻃ': 'ط',
-        'ﻇ': 'ظ',
-        'ﻋ': 'ع',
-        'ﻏ': 'غ',
-        'ﻓ': 'ف',
-        'ﻗ': 'ق',
-        'ﻛ': 'ك',
-        'ﻟ': 'ل',
-        'ﻣ': 'م',
-        'ﻧ': 'ن',
-        'ﻫ': 'ه',
-        'ﻳ': 'ي',
-        
-        # Middle forms
-        'ﺒ': 'ب',
-        'ﺘ': 'ت',
-        'ﺜ': 'ث',
-        'ﺠ': 'ج',
-        'ﺤ': 'ح',
-        'ﺨ': 'خ',
-        'ﺴ': 'س',
-        'ﺸ': 'ش',
-        'ﺼ': 'ص',
-        'ﻀ': 'ض',
-        'ﻄ': 'ط',
-        'ﻈ': 'ظ',
-        'ﻌ': 'ع',
-        'ﻐ': 'غ',
-        'ﻔ': 'ف',
-        'ﻘ': 'ق',
-        'ﻜ': 'ك',
-        'ﻠ': 'ل',
-        'ﻤ': 'م',
-        'ﻨ': 'ن',
-        'ﻬ': 'ه',
-        'ﻴ': 'ي',
-        
-        # End forms
-        'ﺐ': 'ب',
-        'ﺖ': 'ت',
-        'ﺚ': 'ث',
-        'ﺞ': 'ج',
-        'ﺢ': 'ح',
-        'ﺦ': 'خ',
-        'ﺲ': 'س',
-        'ﺶ': 'ش',
-        'ﺺ': 'ص',
-        'ﺾ': 'ض',
-        'ﻂ': 'ط',
-        'ﻆ': 'ظ',
-        'ﻊ': 'ع',
-        'ﻎ': 'غ',
-        'ﻒ': 'ف',
-        'ﻖ': 'ق',
-        'ﻚ': 'ك',
-        'ﻞ': 'ل',
-        'ﻢ': 'م',
-        'ﻦ': 'ن',
-        'ﻪ': 'ه',
-        'ﻲ': 'ي',
-        
-        # Common combinations in middle of word
-        'ﻤﺠ': 'مج',
-        'ﺠﻤ': 'جم',
-        'ﺤﻤ': 'حم',
-        'ﻤﺤ': 'مح',
-        'ﻌﻤ': 'عم',
-        'ﻤﻌ': 'مع',
-        'ﻤﻨ': 'من',
-        'ﻨﻤ': 'نم',
-        'ﺴﻠ': 'سل',
-        'ﻠﺴ': 'لس',
-        'ﻋﻠ': 'عل',
-        'ﻠﻌ': 'لع',
     }
     
     # Add common word patterns that might be misrecognized
@@ -286,85 +151,31 @@ def fix_arabic_ocr_errors(text: str) -> str:
     # Common religious phrases that might be misrecognized
     religious_phrases = {
         r'صل[ىي]\s*[اآ]لله\s*عل[يى]ه\s*[وﻭ]سلم': 'صلى الله عليه وسلم',
-        r'رض[يى]\s*[اآ]لله\s*عنه': 'رضي الله عنه',
-        r'عز\s*[وﻭ]جل': 'عز وجل',
-        r'تعال[ىي]': 'تعالى',
-        r'سبحانه': 'سبحانه',
-        r'تبارك': 'تبارك',
-        r'حديث\s*(صحيح|حسن|ضعيف)': r'حديث \1',
+       
     }
     
     # Fix common letter mistakes
     letter_fixes = {
         'ھ': 'ه',    # Fix different forms of Ha
-        'ے': 'ی',    # Fix Ya variants
-        'ﺓ': 'ة',    # Fix Ta Marbuta
-        'ﷲ': 'الله', # Fix Allah ligature
-        'ﷺ': 'صلى الله عليه وسلم',  # Fix Prophet's blessing
-        'ﷻ': 'سبحانه وتعالى',       # Fix Allah's glorification
-        'ﷴ': 'محمد',                # Fix Muhammad's name
-        'ﷳ': 'اكبر',                # Fix Akbar
-        'ﱞ': 'ً',    # Tanween Fathatan
-        'ﱟ': 'ٍ',    # Tanween Kasratan
-        'ﱠ': 'ّ',    # Shadda
-        'ﱡ': 'ٌ',    # Tanween Dammatan
+       
     }
     
     # Arabic numbers and their Western equivalents
     arabic_numbers = {
         '٠': '0', '١': '1', '٢': '2', '٣': '3', '٤': '4',
-        '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9',
-        '٪': '%',  # Arabic percentage
-        '٫': '.',  # Arabic decimal separator
-        '٬': ',',  # Arabic thousands separator
+      
     }
     
     # Enhanced Quranic symbols and markers
     quranic_symbols = {
         '۝': '۝',    # Sajdah
-        '۞': '۞',    # Hizb
-        '﷽': '﷽',    # Bismillah
-        '﴾': '﴾',    # Quranic bracket opening
-        '﴿': '﴿',    # Quranic bracket closing
-        '۩': '۩',    # Sajdah mark
-        '۠': '۠',    # Quranic stop sign
-        '۫': '۫',    # Quranic small high seen
-        '۪': '۪',    # Quranic small high seen alternate
-        'ۭ': 'ۭ',    # Quranic small high yeh
-        '۬': '۬',    # Quranic small high noon
-        '۟': '۟',    # Small high waw
-        '۝': '۝',    # End of ayah
-        '۞': '۞',    # Start of quarter hizb
-        '†': '†',    # Verse marker
-        '‡': '‡',    # Section marker
-        '۰': '۰',    # Extended Arabic-Indic digit zero
-        '۱': '۱',    # and so on...
-        '۲': '۲',
-        '۳': '۳',
-        '۴': '۴',
-        '۵': '۵',
-        '۶': '۶',
-        '۷': '۷',
-        '۸': '۸',
-        '۹': '۹',
+       
     }
     
     # Diacritical marks and special characters
     diacritics = {
         'ٰ': 'ٰ',     # Superscript alef
-        'ٖ': 'ٖ',     # Subscript alef
-        'ٗ': 'ٗ',     # Inverted damma
-        'ٜ': 'ٜ',     # High hamza
-        'ٕ': 'ٕ',     # High waw
-        'ٔ': 'ٔ',     # High yeh
-        'ْ': 'ْ',     # Sukun
-        'ُ': 'ُ',     # Damma
-        'ِ': 'ِ',     # Kasra
-        'َ': 'َ',     # Fatha
-        'ّ': 'ّ',     # Shadda
-        'ً': 'ً',     # Tanween Fath
-        'ٍ': 'ٍ',     # Tanween Kasr
-        'ٌ': 'ٌ',     # Tanween Damm
+     
     }
 
     # Apply all fixes
@@ -398,7 +209,7 @@ def fix_arabic_ocr_errors(text: str) -> str:
         ]
         
         for pattern, replacement in patterns:
-            text = re.sub(pattern, replacement, text)
+            text = re.sub(pattern, replacement)
         return text
     
     # Apply connected letter fixes
@@ -407,29 +218,18 @@ def fix_arabic_ocr_errors(text: str) -> str:
     return text
 
 def get_pdf_info(pdf_file) -> Dict[str, any]:
-    """
-    Get information about a PDF file.
-    
-    Args:
-        pdf_file: The uploaded PDF file object
-    
-    Returns:
-        Dictionary with PDF information
-    """
+    """Get PDF information using PyMuPDF."""
     try:
-        # Read PDF bytes
         pdf_bytes = pdf_file.getvalue() if hasattr(pdf_file, 'getvalue') else pdf_file.read()
+        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
         
-        # Create a PDF reader object
-        pdf_reader = PyPDF2.PdfReader(io.BytesIO(pdf_bytes))
-        
-        # Get information about the PDF
         info = {
-            "num_pages": len(pdf_reader.pages),
-            "metadata": pdf_reader.metadata if hasattr(pdf_reader, 'metadata') else {},
+            "num_pages": len(doc),
+            "metadata": doc.metadata,
             "file_size": len(pdf_bytes) / 1024  # Size in KB
         }
         
+        doc.close()
         return info
         
     except Exception as e:
