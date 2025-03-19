@@ -90,7 +90,7 @@ with col1:
     source_lang = st.selectbox(
         "Select source language:",
         [
-            "Arabic", "English", "French", "German", "Spanish", "Italian", "Chinese", 
+            "Auto-Detect","Arabic", "English", "French", "German", "Spanish", "Italian", "Chinese", 
             "Japanese", "Korean", "Portuguese", "Russian", "Hindi", "Bengali", 
             "Urdu", "Turkish", "Vietnamese", "Thai", "Dutch", "Greek", "Swedish", 
             "Norwegian", "Danish", "Finnish", "Polish", "Czech", "Hungarian", 
