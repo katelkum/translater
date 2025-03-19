@@ -1,7 +1,8 @@
 import google.generativeai as genai
 import os
 from typing import List, Dict, Any, Optional, Literal
-from PIL import Image
+from PIL import Image, ImageOps  # Add ImageOps for image processing
+import pytesseract
 from io import BytesIO
 
 # Supported translation providers
@@ -115,62 +116,47 @@ def translate_chunks(chunks: List[str], provider: TranslationProvider = "gemini"
 
 def translate_image(image: Image.Image, provider: TranslationProvider = "gemini",
                    source_lang: str = "Arabic", target_lang: str = "English") -> Optional[str]:
-    """
-    Translate text from an image using the selected provider.
-    """
+    """Translate text from an image using the selected provider."""
     try:
-        model_configs = [
-            ('gemini-2.0-flash-exp', True),
-        ]
-        
         img_byte_arr = BytesIO()
-        image.save(img_byte_arr, format='PNG')
+        image.save(img_byte_arr, format='PNG', optimize=True, quality=95)
         img_byte_arr = img_byte_arr.getvalue()
         
-        last_error = None
-        for model_name, is_vision_model in model_configs:
-            try:
-                model = genai.GenerativeModel(model_name)
-                
-                prompt = f"""You are an expert translator analyzing a PDF page from {source_lang} to {target_lang}. 
-                        Act as a professional translator.
-                        
-                        TRANSLATION REQUIREMENTS:
-                        1. Translate the text from {source_lang} to {target_lang}
-                        2. Preserve formatting and structure
-                        3. Keep religious/technical terms with translations in parentheses
-                        4. Ensure natural flow in {target_lang}
+        try:
+            model = genai.GenerativeModel('gemini-pro-vision')
+            
+            prompt = f"""You are an expert translator analyzing a PDF page from {source_lang} to {target_lang}. 
+                    Act as a professional translator.
+                    
+                    TRANSLATION REQUIREMENTS:
+                    1. Translate the text from {source_lang} to {target_lang}
+                    2. Preserve formatting and structure
+                    3. Keep religious/technical terms with translations in parentheses
+                    4. Ensure natural flow in {target_lang}
 
-                        OUTPUT FORMAT:
-                        - Provide ONLY the {target_lang} translation
-                        - Maintain paragraph structure
-                        - Use proper {target_lang} punctuation
-                        - Do not include the original text
-                        """
+                    OUTPUT FORMAT:
+                    - Provide ONLY the {target_lang} translation
+                    - Maintain paragraph structure
+                    - Use proper {target_lang} punctuation
+                    """
+            
+            response = model.generate_content([prompt, {"mime_type": "image/png", "data": img_byte_arr}])
+            
+            if response and hasattr(response, 'text'):
+                return response.text.strip()
                 
-                if is_vision_model:
-                    response = model.generate_content([prompt, {"mime_type": "image/png", "data": img_byte_arr}])
-                else:
-                    import pytesseract
-                    extracted_text = pytesseract.image_to_string(Image.open(BytesIO(img_byte_arr)), lang='ara+ita')
-                    response = model.generate_content(f"{prompt}\n\nText to translate:\n{extracted_text}")
-                
-                if response and hasattr(response, 'text'):
-                    return response.text.strip()
-                
-            except Exception as e:
-                last_error = str(e)
-                continue
-        
-        if last_error:
-            raise Exception(f"All translation models failed. Last error: {last_error}")
+        except Exception as e:
+            # Fallback to OCR if vision model fails
+            extracted_text = pytesseract.image_to_string(image, lang='ara+ita')
+            if extracted_text.strip():
+                return translate_text(extracted_text, provider, source_lang, target_lang)
+            raise e
         
         return "Translation failed. Please try a different API key or contact support."
         
     except Exception as e:
         print(f"Image translation error: {str(e)}")
-        return f"Image translation error: {str(e)}. Please ensure the image is valid and try again."
-
+        return f"Translation error: {str(e)}. Please try again."
 
 def translate_pdf_pages(images: List[Image.Image], provider: TranslationProvider = "gemini",
                        source_lang: str = "Arabic", target_lang: str = "Italian",
