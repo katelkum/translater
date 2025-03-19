@@ -45,18 +45,89 @@ api_key = st.text_input(
     type="password"
 )
 
+# Add help popup/info button
+with st.expander("ℹ️ How to use this application"):
+    st.markdown("""
+    ### Getting Started
+    1. **Get an API Key**:
+        - Go to [Google AI Studio](https://makersuite.google.com/app/apikey)
+        - Sign in with your Google account
+        - Click "Create API Key"
+        - Copy the generated key
+    
+    2. **Using the Translator**:
+        - Paste your API key in the field above
+        - Select source and target languages
+        - Upload your PDF file
+        - Choose pages to translate
+        - Click "Translate PDF Pages Directly"
+        
+    ### Important Notes
+    - **File Size**: Maximum file size is 200MB
+    - **Supported Languages**: multiple languages
+    - **API Usage**: Each translation uses your API quota
+    - **Best Practices**:
+        - Ensure PDF text is clear and readable
+        - For Arabic text, use high-quality scans
+        - Religious terms will be kept in Arabic with translations
+        
+    ### Troubleshooting
+    - If translation fails, try:
+        1. Checking your API key
+        2. Reducing PDF file size
+        3. Selecting fewer pages at once
+        4. Ensuring PDF quality is good
+    
+    ### Need Help?
+    Visit [Google AI Studio Support](https://ai.google.dev/tutorials/setup) for more information
+    """)
+
 # Add after API Key input and before file uploader
 col1, col2 = st.columns(2)
 with col1:
     source_lang = st.selectbox(
         "Select source language:",
-        ["Arabic", "English", "French", "German", "Spanish", "Italian"],
+        [
+            "Arabic", "English", "French", "German", "Spanish", "Italian", "Chinese", 
+            "Japanese", "Korean", "Portuguese", "Russian", "Hindi", "Bengali", 
+            "Urdu", "Turkish", "Vietnamese", "Thai", "Dutch", "Greek", "Swedish", 
+            "Norwegian", "Danish", "Finnish", "Polish", "Czech", "Hungarian", 
+            "Romanian", "Slovak", "Bulgarian", "Croatian", "Serbian", "Slovenian", 
+            "Malay", "Indonesian", "Filipino", "Hebrew", "Persian", "Swahili", 
+            "Zulu", "Afrikaans", "Ukrainian", "Catalan", "Basque", "Galician", 
+            "Welsh", "Irish", "Scottish Gaelic", "Icelandic", "Latvian", "Lithuanian", 
+            "Estonian", "Maltese", "Luxembourgish", "Albanian", "Macedonian", 
+            "Bosnian", "Armenian", "Georgian", "Azerbaijani", "Kazakh", "Uzbek", 
+            "Tajik", "Kyrgyz", "Turkmen", "Mongolian", "Pashto", "Sinhala", 
+            "Tamil", "Telugu", "Kannada", "Malayalam", "Marathi", "Gujarati", 
+            "Punjabi", "Odia", "Assamese", "Maithili", "Nepali", "Burmese", 
+            "Khmer", "Lao", "Hmong", "Yoruba", "Hausa", "Igbo", "Amharic", 
+            "Tigrinya", "Somali", "Shona", "Xhosa", "Tswana", "Sesotho", 
+            "Chichewa", "Malagasy", "Fijian", "Samoan", "Tongan", "Maori"
+        ],
         index=0
     )
 with col2:
     target_lang = st.selectbox(
         "Select target language:",
-        ["Arabic", "English", "French", "German", "Spanish", "Italian"],
+[
+            "Arabic", "English", "French", "German", "Spanish", "Italian", "Chinese", 
+            "Japanese", "Korean", "Portuguese", "Russian", "Hindi", "Bengali", 
+            "Urdu", "Turkish", "Vietnamese", "Thai", "Dutch", "Greek", "Swedish", 
+            "Norwegian", "Danish", "Finnish", "Polish", "Czech", "Hungarian", 
+            "Romanian", "Slovak", "Bulgarian", "Croatian", "Serbian", "Slovenian", 
+            "Malay", "Indonesian", "Filipino", "Hebrew", "Persian", "Swahili", 
+            "Zulu", "Afrikaans", "Ukrainian", "Catalan", "Basque", "Galician", 
+            "Welsh", "Irish", "Scottish Gaelic", "Icelandic", "Latvian", "Lithuanian", 
+            "Estonian", "Maltese", "Luxembourgish", "Albanian", "Macedonian", 
+            "Bosnian", "Armenian", "Georgian", "Azerbaijani", "Kazakh", "Uzbek", 
+            "Tajik", "Kyrgyz", "Turkmen", "Mongolian", "Pashto", "Sinhala", 
+            "Tamil", "Telugu", "Kannada", "Malayalam", "Marathi", "Gujarati", 
+            "Punjabi", "Odia", "Assamese", "Maithili", "Nepali", "Burmese", 
+            "Khmer", "Lao", "Hmong", "Yoruba", "Hausa", "Igbo", "Amharic", 
+            "Tigrinya", "Somali", "Shona", "Xhosa", "Tswana", "Sesotho", 
+            "Chichewa", "Malagasy", "Fijian", "Samoan", "Tongan", "Maori"
+        ],
         index=5  # Italian
     )
 
@@ -275,4 +346,4 @@ if st.session_state.uploaded_file is not None and st.session_state.pdf_info is n
 
 # Footer
 st.write("---")
-st.caption("PDF Translator Application | Translates PDF documents from Arabic to Italian using Google's Gemini API")
+st.caption("PDF Translator Application | Translates PDF documents using Google's Gemini API | Developed by [ABDULRAHMAN]")
