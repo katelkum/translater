@@ -19,7 +19,27 @@ def initialize_gemini_api(api_key: str) -> None:
 def get_translation_prompt(source_lang: str, target_lang: str) -> str:
     """Get the appropriate translation prompt based on source language."""
     
-    if source_lang.lower() == "arabic":
+    if source_lang.lower() == "auto-detect":
+        return f"""You are an expert translator. First, analyze and identify the source language of the text.
+        Then translate it to {target_lang}.
+
+        REQUIREMENTS:
+        1. First line of output must be: "Detected Language: [language name]"
+        2. Second line must be empty
+        3. Then provide the translation
+        
+        TRANSLATION GUIDELINES:
+        1. Maintain original meaning and tone
+        2. Use natural {target_lang} expressions
+        3. For religious/technical terms: keep original with translations in parentheses
+        4. Preserve formatting and structure
+        
+        OUTPUT FORMAT:
+        Detected Language: [language name]
+
+        [Translation in {target_lang}]
+        """
+    elif source_lang.lower() == "arabic":
         return f"""You are an expert translator specializing in {source_lang} to {target_lang} translations, with extensive knowledge of Islamic texts and cultural context.
 
         IMPORTANT CONTEXT HANDLING:
@@ -114,7 +134,7 @@ def translate_chunks(chunks: List[str], provider: TranslationProvider = "gemini"
     return translated_chunks
 
 def translate_image(image: Image.Image, provider: TranslationProvider = "gemini",
-                   source_lang: str = "Arabic", target_lang: str = "English") -> Optional[str]:
+                   source_lang: str = "Auto-Detect", target_lang: str = "English") -> Optional[str]:
     """Translate text from an image using the selected provider."""
     max_retries = 3
     
@@ -133,23 +153,40 @@ def translate_image(image: Image.Image, provider: TranslationProvider = "gemini"
             try:
                 model = genai.GenerativeModel('gemini-2.0-flash-exp')
                 
-                prompt = f"""You are an expert translator analyzing this page from {source_lang} to {target_lang}.
-                        Your task is to provide a clear and accurate translation.
-                        
-                        REQUIREMENTS:
-                        1. Translate ALL visible text from {source_lang} to {target_lang}
-                        2. Maintain the original formatting and structure
-                        3. For Arabic religious terms: keep them in Arabic followed by translation in parentheses
-                        4. If text is unclear, make educated guesses based on context
-                        
-                        OUTPUT FORMAT:
-                        - Only provide the {target_lang} translation
-                        - Preserve paragraph breaks and structure
-                        - Use appropriate {target_lang} punctuation
+                if source_lang.lower() == "auto-detect":
+                    prompt = f"""You are an expert translator analyzing this image.
+                            First, identify the language of any text in the image.
+                            Then translate it to {target_lang}.
+                            
+                            REQUIREMENTS:
+                            1. First identify the source language
+                            2. Translate ALL visible text to {target_lang}
+                            3. Maintain formatting and structure
+                            4. For special terms: keep original in arabic  with translations
+                            
+                            OUTPUT FORMAT:
+                            Detected Language: [language name]
 
-                        IMPORTANT: If you see any text in the image, you must translate it. 
-                        If the image appears blank or unreadable, explicitly state that.
-                        """
+                            [Translation in {target_lang}]
+                            """
+                else:
+                    prompt = f"""You are an expert translator analyzing this page from {source_lang} to {target_lang}.
+                            Your task is to provide a clear and accurate translation.
+                            
+                            REQUIREMENTS:
+                            1. Translate ALL visible text from {source_lang} to {target_lang}
+                            2. Maintain the original formatting and structure
+                            3. For Arabic religious terms: keep them in Arabic followed by translation in parentheses
+                            4. If text is unclear, make educated guesses based on context
+                            
+                            OUTPUT FORMAT:
+                            - Only provide the {target_lang} translation
+                            - Preserve paragraph breaks and structure
+                            - Use appropriate {target_lang} punctuation
+
+                            IMPORTANT: If you see any text in the image, you must translate it. 
+                            If the image appears blank or unreadable, explicitly state that.
+                            """
                 
                 response = model.generate_content([
                     prompt, 
