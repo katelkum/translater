@@ -1,8 +1,9 @@
 streamlit
-pdf2image
+PyMuPDF
 google-api-python-client
 google-generativeai
+PyPDF2
 pillow
 protobuf
-PyMuPDF
-pytesseract
+python-docx
+docx2txt
