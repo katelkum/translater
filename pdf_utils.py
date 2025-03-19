@@ -7,13 +7,12 @@ from pdf2image import convert_from_bytes
 import pytesseract
 from PIL import Image
 
-def extract_text_from_pdf(pdf_file, method="standard") -> Tuple[str, int]:
+def extract_text_from_pdf(pdf_file) -> Tuple[str, int]:
     """
-    Extract text from a PDF file using the specified method.
+    Extract text from a PDF file using OCR.
     
     Args:
         pdf_file: The uploaded PDF file object
-        method: The extraction method ('standard' or 'ocr')
     
     Returns:
         Tuple containing the extracted text and the number of pages
@@ -26,74 +25,49 @@ def extract_text_from_pdf(pdf_file, method="standard") -> Tuple[str, int]:
         # Get the number of pages
         num_pages = len(pdf_reader.pages)
         
-        # Use the standard PyPDF2 extraction method
-        if method == "standard":
-            text = ""
-            for page_num in range(num_pages):
-                page = pdf_reader.pages[page_num]
-                text += page.extract_text() + "\n\n"
-            return text, num_pages
+        # Convert PDF to images with higher DPI for better OCR
+        images = convert_from_bytes(pdf_bytes, dpi=400)  # Increased DPI for better recognition
+        text = ""
         
-        # Use OCR-based extraction
-        else:  # method == "ocr"
-            # Convert PDF to images with higher DPI for better OCR
-            images = convert_from_bytes(pdf_bytes, dpi=400)  # Increased DPI for better recognition
-            text = ""
+        # Extract text from each image using enhanced OCR with better Arabic support
+        for image in images:
+            # Convert to grayscale for better OCR performance
+            img_gray = image.convert('L')
             
-            # Extract text from each image using enhanced OCR with better Arabic support
-            for image in images:
-                # Apply image preprocessing for better OCR results with Arabic text
-                # Convert to grayscale for better OCR performance
-                img_gray = image.convert('L')
+            try:
+                # Best configuration for Arabic
+                page_text = pytesseract.image_to_string(
+                    img_gray, 
+                    lang='ara+ita', 
+                    config='--psm 6 --oem 1'
+                )
                 
-                # Try multiple OCR approaches to improve Arabic character recognition
-                try:
-                    # Best configuration for Arabic
-                    # --psm 6: Assume a single uniform block of text
-                    # --oem 1: LSTM OCR engine only
-                    # This configuration works better for Arabic diacritics and special symbols
+                # If no text is extracted or very little, try different configurations
+                if len(page_text.strip()) < 20:
                     page_text = pytesseract.image_to_string(
                         img_gray, 
-                        lang='ara+ita', 
-                        config='--psm 6 --oem 1'
+                        lang='ara', 
+                        config='--psm 3 --oem 1'
                     )
-                    
-                    # If no text is extracted or very little, try Arabic only with different config
-                    if len(page_text.strip()) < 20:
-                        page_text = pytesseract.image_to_string(
-                            img_gray, 
-                            lang='ara', 
-                            config='--psm 6 --oem 1'
-                        )
-                    
-                    # If still no text, try with different page segmentation mode
-                    if len(page_text.strip()) < 20:
-                        page_text = pytesseract.image_to_string(
-                            img_gray, 
-                            lang='ara', 
-                            config='--psm 3 --oem 1'
-                        )
-                    
-                except Exception as e:
-                    # Fallback to basic OCR if language packs are not available
-                    print(f"OCR exception: {str(e)}")
-                    page_text = pytesseract.image_to_string(img_gray)
                 
-                text += page_text + "\n\n"
+            except Exception as e:
+                print(f"OCR exception: {str(e)}")
+                page_text = pytesseract.image_to_string(img_gray)
             
-            return text, num_pages
+            text += page_text + "\n\n"
+        
+        return text, num_pages
             
     except Exception as e:
         raise Exception(f"Error extracting text from PDF: {str(e)}")
 
-def extract_text_from_pdf_page(pdf_file, page_num: int, method="standard") -> str:
+def extract_text_from_pdf_page(pdf_file, page_num: int) -> str:
     """
-    Extract text from a specific page of a PDF file.
+    Extract text from a specific page of a PDF file using OCR.
     
     Args:
         pdf_file: The uploaded PDF file object
         page_num: The page number to extract (0-indexed)
-        method: The extraction method ('standard' or 'ocr')
     
     Returns:
         Extracted text from the specified page
@@ -102,79 +76,53 @@ def extract_text_from_pdf_page(pdf_file, page_num: int, method="standard") -> st
         # Read PDF bytes
         pdf_bytes = pdf_file.getvalue() if hasattr(pdf_file, 'getvalue') else pdf_file.read()
         
-        # Use the standard PyPDF2 extraction method
-        if method == "standard":
-            pdf_reader = PyPDF2.PdfReader(io.BytesIO(pdf_bytes))
-            
-            # Check if page number is valid
-            if page_num < 0 or page_num >= len(pdf_reader.pages):
-                raise ValueError(f"Invalid page number: {page_num+1}. PDF has {len(pdf_reader.pages)} pages.")
-            
-            # Extract text from the specified page
-            page = pdf_reader.pages[page_num]
-            text = page.extract_text()
-            return text
+        # Convert specific PDF page to image with high DPI for better symbol recognition
+        images = convert_from_bytes(pdf_bytes, first_page=page_num+1, last_page=page_num+1, dpi=600)
         
-        # Use OCR-based extraction
-        else:  # method == "ocr"
-            # Convert specific PDF page to image with very high DPI for better symbol recognition
-            images = convert_from_bytes(pdf_bytes, first_page=page_num+1, last_page=page_num+1, dpi=600)
-            
-            if not images:
-                raise ValueError(f"Failed to convert page {page_num+1} to image.")
-            
-            # Enhanced image preprocessing
-            image = images[0]
-            
-            # Create multiple versions of the image for different recognition passes
-            img_gray = image.convert('L')  # Grayscale
-            img_binary = img_gray.point(lambda x: 0 if x < 128 else 255, '1')  # Binary
-            
-            extracted_texts = []
-            
-            # Multiple OCR passes with different configurations
-            ocr_configs = [
-                # Configuration for standard Arabic text with diacritics
-                {
-                    'lang': 'ara+ita',
-                    'config': '--psm 6 --oem 1 -c preserve_interword_spaces=1 -c textord_heavy_nr=1'
-                },
-                # Special config for religious symbols and notation
-                {
-                    'lang': 'ara',
-                    'config': '--psm 4 --oem 1 -c preserve_interword_spaces=1 -c textord_heavy_nr=1 -c textord_min_linesize=1'
-                },
-                # Config for Quranic text with full diacritics
-                {
-                    'lang': 'ara',
-                    'config': '--psm 6 --oem 1 -c preserve_interword_spaces=1 -c textord_heavy_nr=1 -c textord_min_linesize=1 -c textord_tabfind_show_vlines=0'
-                }
-            ]
-            
-            for config in ocr_configs:
-                try:
-                    # Try OCR with current configuration
-                    text = pytesseract.image_to_string(
-                        img_binary if 'binary' in config.get('config', '') else img_gray,
-                        lang=config['lang'],
-                        config=config['config']
-                    )
-                    extracted_texts.append(text)
-                except Exception as e:
-                    print(f"OCR pass failed: {str(e)}")
-                    continue
-            
-            # Post-processing to handle special cases
-            final_text = ""
-            for text in extracted_texts:
-                # Replace common OCR mistakes in Arabic
-                text = fix_arabic_ocr_errors(text)
-                
-                # If this version has more special characters, prefer it
-                if len([c for c in text if is_special_arabic_char(c)]) > len([c for c in final_text if is_special_arabic_char(c)]):
-                    final_text = text
-            
-            return final_text or extracted_texts[0] if extracted_texts else ""
+        if not images:
+            raise ValueError(f"Failed to convert page {page_num+1} to image.")
+        
+        # Enhanced image preprocessing
+        image = images[0]
+        img_gray = image.convert('L')  # Grayscale
+        img_binary = img_gray.point(lambda x: 0 if x < 128 else 255, '1')  # Binary
+        
+        extracted_texts = []
+        
+        # Multiple OCR passes with different configurations
+        ocr_configs = [
+            # Configuration for standard Arabic text with diacritics
+            {
+                'lang': 'ara+ita',
+                'config': '--psm 6 --oem 1 -c preserve_interword_spaces=1 -c textord_heavy_nr=1'
+            },
+            # Config for Quranic text with full diacritics
+            {
+                'lang': 'ara',
+                'config': '--psm 6 --oem 1 -c preserve_interword_spaces=1 -c textord_heavy_nr=1 -c textord_min_linesize=1'
+            }
+        ]
+        
+        for config in ocr_configs:
+            try:
+                text = pytesseract.image_to_string(
+                    img_binary if 'binary' in config.get('config', '') else img_gray,
+                    lang=config['lang'],
+                    config=config['config']
+                )
+                extracted_texts.append(text)
+            except Exception as e:
+                print(f"OCR pass failed: {str(e)}")
+                continue
+        
+        # Post-processing to handle special cases
+        final_text = ""
+        for text in extracted_texts:
+            text = fix_arabic_ocr_errors(text)
+            if len([c for c in text if is_special_arabic_char(c)]) > len([c for c in final_text if is_special_arabic_char(c)]):
+                final_text = text
+        
+        return final_text or extracted_texts[0] if extracted_texts else ""
             
     except Exception as e:
         raise Exception(f"Error extracting text from PDF page {page_num+1}: {str(e)}")
