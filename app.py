@@ -6,6 +6,8 @@ from datetime import datetime
 from pdf_utils import get_pdf_info, chunk_text
 from translation import initialize_gemini_api, translate_chunks, translate_text, translate_image, translate_pdf_pages
 from pdf2image import convert_from_bytes
+import fitz  # PyMuPDF
+from PIL import Image  # Add this import
 
 # Set page config
 st.set_page_config(
@@ -156,25 +158,23 @@ if st.session_state.uploaded_file is not None and st.session_state.pdf_info is n
                         st.session_state.page_translations = {}
                         st.session_state.page_images = {}
                         
-                        # First, convert PDF pages to images - only the selected pages
+                        # Open PDF with PyMuPDF
                         pdf_bytes = st.session_state.uploaded_file.getvalue()
+                        pdf_document = fitz.open(stream=pdf_bytes, filetype="pdf")
                         
-                        # Convert only selected pages to save memory - use first_page and last_page arguments
                         selected_images = []
                         for page_num in st.session_state.selected_pages:
-                            # Convert just this single page to image
-                            page_images = convert_from_bytes(
-                                pdf_bytes, 
-                                dpi=300, 
-                                first_page=page_num+1, 
-                                last_page=page_num+1
-                            )
-                            
-                            if page_images and len(page_images) > 0:
-                                selected_images.append((page_num, page_images[0]))
+                            # Get page
+                            page = pdf_document[page_num]
+                            # Convert page to image
+                            pix = page.get_pixmap(matrix=fitz.Matrix(300/72, 300/72))
+                            img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+                            selected_images.append((page_num, img))
                         
-                        # Now we can clear the original PDF from memory 
-                        # to optimize memory usage since we only need the selected pages
+                        # Close PDF document
+                        pdf_document.close()
+                        
+                        # Clear PDF from memory
                         st.session_state.uploaded_file = None
                         pdf_bytes = None
                         
