@@ -116,43 +116,69 @@ def translate_chunks(chunks: List[str], provider: TranslationProvider = "gemini"
 def translate_image(image: Image.Image, provider: TranslationProvider = "gemini",
                    source_lang: str = "Arabic", target_lang: str = "English") -> Optional[str]:
     """Translate text from an image using the selected provider."""
-    try:
-        img_byte_arr = BytesIO()
-        image.save(img_byte_arr, format='PNG', optimize=True, quality=95)
-        img_byte_arr = img_byte_arr.getvalue()
-        
+    max_retries = 3
+    
+    # Preprocess image to improve quality
+    img = image.convert('RGB')
+    # Resize if image is too large (max 4096x4096)
+    if img.size[0] > 4096 or img.size[1] > 4096:
+        img.thumbnail((4096, 4096), Image.Resampling.LANCZOS)
+    
+    for attempt in range(max_retries):
         try:
-            model = genai.GenerativeModel('gemini-pro-vision')
+            img_byte_arr = BytesIO()
+            img.save(img_byte_arr, format='PNG', optimize=True, quality=95)
+            img_byte_arr = img_byte_arr.getvalue()
             
-            prompt = f"""You are an expert translator analyzing a PDF page from {source_lang} to {target_lang}. 
-                    Act as a professional translator.
-                    
-                    TRANSLATION REQUIREMENTS:
-                    1. Translate the text from {source_lang} to {target_lang}
-                    2. Preserve formatting and structure
-                    3. Keep religious/technical terms with translations in parentheses
-                    4. Ensure natural flow in {target_lang}
-
-                    OUTPUT FORMAT:
-                    - Provide ONLY the {target_lang} translation
-                    - Maintain paragraph structure
-                    - Use proper {target_lang} punctuation
-                    """
-            
-            response = model.generate_content([prompt, {"mime_type": "image/png", "data": img_byte_arr}])
-            
-            if response and hasattr(response, 'text'):
-                return response.text.strip()
-            else:
-                return "No text could be extracted from this page."
+            try:
+                model = genai.GenerativeModel('gemini-2.0-flash-exp')
                 
+                prompt = f"""You are an expert translator analyzing this page from {source_lang} to {target_lang}.
+                        Your task is to provide a clear and accurate translation.
+                        
+                        REQUIREMENTS:
+                        1. Translate ALL visible text from {source_lang} to {target_lang}
+                        2. Maintain the original formatting and structure
+                        3. For Arabic religious terms: keep them in Arabic followed by translation in parentheses
+                        4. If text is unclear, make educated guesses based on context
+                        
+                        OUTPUT FORMAT:
+                        - Only provide the {target_lang} translation
+                        - Preserve paragraph breaks and structure
+                        - Use appropriate {target_lang} punctuation
+
+                        IMPORTANT: If you see any text in the image, you must translate it. 
+                        If the image appears blank or unreadable, explicitly state that.
+                        """
+                
+                response = model.generate_content([
+                    prompt, 
+                    {"mime_type": "image/png", "data": img_byte_arr}
+                ], generation_config={
+                    "temperature": 0.2,
+                    "top_p": 0.8,
+                    "top_k": 40
+                })
+                
+                if response and hasattr(response, 'text'):
+                    translated_text = response.text.strip()
+                    if translated_text:
+                        return translated_text
+                    else:
+                        raise Exception("Empty response from model")
+                        
+            except Exception as e:
+                print(f"Vision model error (attempt {attempt + 1}): {str(e)}")
+                if attempt == max_retries - 1:  # Last attempt
+                    raise e
+                continue
+            
         except Exception as e:
-            print(f"Vision model error: {str(e)}")
-            return f"Translation error: Could not process page. Please try again."
-        
-    except Exception as e:
-        print(f"Image translation error: {str(e)}")
-        return f"Translation error: {str(e)}. Please try again."
+            if attempt == max_retries - 1:  # Last attempt
+                print(f"Image translation error after {max_retries} attempts: {str(e)}")
+                return "No readable text could be found on this page. Please check the image quality and try again."
+    
+    return "Translation failed after multiple attempts. Please try again."
 
 def translate_pdf_pages(images: List[Image.Image], provider: TranslationProvider = "gemini",
                        source_lang: str = "Arabic", target_lang: str = "Italian",
