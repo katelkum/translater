@@ -1,0 +1,7 @@
+streamlit
+pdf2image
+google-api-python-client
+pillow
+pytesseract
+protobuf
+PyPDF2
