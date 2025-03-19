@@ -7,3 +7,5 @@ pillow
 pytesseract
 protobuf
 PyPDF2
+python-poppler
+poppler-utils
