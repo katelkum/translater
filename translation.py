@@ -1,8 +1,7 @@
 import google.generativeai as genai
 import os
 from typing import List, Dict, Any, Optional, Literal
-from PIL import Image, ImageOps  # Add ImageOps for image processing
-import pytesseract
+from PIL import Image
 from io import BytesIO
 
 # Supported translation providers
@@ -144,15 +143,12 @@ def translate_image(image: Image.Image, provider: TranslationProvider = "gemini"
             
             if response and hasattr(response, 'text'):
                 return response.text.strip()
+            else:
+                return "No text could be extracted from this page."
                 
         except Exception as e:
-            # Fallback to OCR if vision model fails
-            extracted_text = pytesseract.image_to_string(image, lang='ara+ita')
-            if extracted_text.strip():
-                return translate_text(extracted_text, provider, source_lang, target_lang)
-            raise e
-        
-        return "Translation failed. Please try a different API key or contact support."
+            print(f"Vision model error: {str(e)}")
+            return f"Translation error: Could not process page. Please try again."
         
     except Exception as e:
         print(f"Image translation error: {str(e)}")
