@@ -83,7 +83,8 @@ def translate_text(text: str, provider: TranslationProvider = "gemini",
                 return None
     except Exception as e:
         print(f"Translation error: {str(e)}")
-        return f"Errore durante la traduzione: {str(e)}"
+        return f"Translation error: {str(e)}. Please check your input and try again."
+
 
 def translate_chunks(chunks: List[str], provider: TranslationProvider = "gemini",
                     source_lang: str = "Arabic", target_lang: str = "Italian", 
@@ -168,7 +169,8 @@ def translate_image(image: Image.Image, provider: TranslationProvider = "gemini"
         
     except Exception as e:
         print(f"Image translation error: {str(e)}")
-        return f"Translation error. Please try again with a different model or API key. Error details: {str(e)}"
+        return f"Image translation error: {str(e)}. Please ensure the image is valid and try again."
+
 
 def translate_pdf_pages(images: List[Image.Image], provider: TranslationProvider = "gemini",
                        source_lang: str = "Arabic", target_lang: str = "Italian",

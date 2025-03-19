@@ -45,7 +45,7 @@ st.write("Upload a PDF document and translate it between multiple languages usin
 # API Key input (with a default value for convenience)
 api_key = st.text_input(
     "Enter your Gemini API Key:", 
-    value="AIzaSyC-Z19b7ea3XIsjXwecO0s195f7GeWiwCw",
+    value=os.getenv("GOOGLE_API_KEY", ""),
     type="password"
 )
 
@@ -71,7 +71,11 @@ if source_lang == target_lang:
 def validate_api_key():
     if api_key:
         try:
-            initialize_gemini_api(api_key)
+            if not api_key:
+                st.error("Please enter a valid API key")
+                return
+            else:
+                initialize_gemini_api(api_key)
             st.session_state.api_key_valid = True
             return True
         except Exception as e:

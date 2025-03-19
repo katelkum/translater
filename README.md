@@ -14,3 +14,4 @@ This Streamlit app translates PDF documents from Arabic to Italian using Google'
 
 In Streamlit Cloud, set:
 - `GOOGLE_API_KEY`: Your Gemini API key
+
