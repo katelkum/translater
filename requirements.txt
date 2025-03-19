@@ -1,6 +1,8 @@
 streamlit
 pdf2image
 google-api-python-client
+google-generativeai
+PyPDF2
 pillow
 pytesseract
 protobuf
